@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"encoding/json"
+	"net/http"
+	"io"
 )
 
 type Reg struct {
@@ -41,6 +43,33 @@ type Config struct {
 	regexMatching map[*regexp.Regexp]string
 }
 
+// write as it downloads and not load the whole file into memory.
+func DownloadFile(filepath string, url string) error {
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	fmt.Println("Downloading filebeat black list file: " + url)
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func defaultConfig() Config {
 
 	var regs = []Reg{{
@@ -49,11 +78,18 @@ func defaultConfig() Config {
 		"Mask email",
 	}}
 
-	//fields := [...]string{"cvv","firstname","lastname","phone",}
 
 	regexMatching := make(map[*regexp.Regexp]string)
 
-	jsonFile, err := os.Open(os.Getenv("BLACK_LIST_PATH"))
+	fileUrl := os.Getenv("BLACK_LIST_URL");
+
+	err := DownloadFile("black-list.json", fileUrl)
+	if err != nil {
+		panic(err)
+	}
+
+
+	jsonFile, err := os.Open("black-list.json")
 
 	if err != nil {
 		fmt.Println(err)
